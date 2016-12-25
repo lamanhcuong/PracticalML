@@ -1,0 +1,136 @@
+---
+title: "Practical Machine Learning Course Project - Prediction"
+author: "Cuong Manh La"
+date: "December 25, 2016"
+output: html_document
+---
+#Executive Summary
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise. The report describes the model being built, the cross validation, the expected out of sample error, and rational of the choices made. Then I will also use chosen prediction model to predict 20 different test cases.
+
+#Processing Data
+##Loading library and getting Data
+###Loading library which are needed in the project:
+
+```{r, echo=TRUE, results='hide', warning=FALSE}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+```
+
+###Getting and loading data
+
+```{r, echo=TRUE}
+if (!file.exists("pml-training.csv")) {
+  download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "pml-training.csv")
+}
+if (!file.exists("pml-testing.csv")) {
+  download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "pml-testing.csv")
+}
+training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+```
+
+
+##Cleaning up the data and Bootstrap
+###Cleanup the data
+The data provided has many variables with missing data, and variables that are not relevant to the question being analyzed, so we will remove those variables from training and testing dataset.
+
+The first 7 variables are not neccessary for analysis, exclude them from training and testing dataset:
+
+```{r, echo=TRUE}
+training <- training[, 8:ncol(training)]
+testing <- testing[, 8:ncol(testing)]
+```
+
+Next remove the variables whose missing data ratio is bigger than some certain number, I choose 30% in my work:
+
+```{r, echo=TRUE}
+maxMissingValRatio <- 0.3
+training_nrow <- nrow(training)
+testing_nrow <- nrow(testing)
+
+training_selNames <- names(training[,colSums(is.na(training))/training_nrow <= maxMissingValRatio])
+testing_selNames <- names(testing[,colSums(is.na(testing))/testing_nrow <= maxMissingValRatio])
+selNames <- c(NULL)
+for (iName in training_selNames){
+    if (iName %in% testing_selNames) {
+        selNames <- c(selNames, iName)
+    }
+}
+
+training <- training[, c(selNames, "classe")]
+testing <- testing[, c(selNames, "problem_id")]
+dim(training); dim(testing)
+```
+
+###Making Training & Testing Subset
+We will partition the original training dataset (which has 19,622 observations) into two subsets: 60% to be used for training and the remaining 40% to be used as the testing set.
+
+```{r, echo=TRUE}
+set.seed(1234)
+inTrain = createDataPartition(y=training$classe, p = .60, list=FALSE)
+trainingSub = training[inTrain,]
+testingSub = training[-inTrain,]
+dim(trainingSub); dim(testingSub)
+```
+
+#Building Predicton Model
+##Decision Tree Model
+
+A decision tree was the first model tested with the method rpart.
+```{r, echo=TRUE}
+set.seed(1271)
+modFitRP <- rpart(classe~., method="class", data=trainingSub)
+#print(modFitRP)
+fancyRpartPlot(modFitRP)
+```
+
+Then predict testing subset with the model:
+```{r, echo=TRUE}
+predictionRP = predict(modFitRP, testingSub, type = "class")
+cfmRP <- confusionMatrix(predictionRP, testingSub$classe)
+print(cfmRP)
+plot(cfmRP$table, col = cfmRP$byClass, main = paste("Decision Tree Confusion Matrix: Accuracy =", round(cfmRP$overall['Accuracy'], 4)))
+```
+
+Accuracy of the decision tree model is 0.7392, a bit good but let's build the random forest model as well and compare the two models.
+
+
+##Random Forest Model
+Next we use random forest model to see if the model fits the data better.
+
+```{r, echo=TRUE}
+set.seed(2471)
+modFitRF <- randomForest(classe ~ ., data = trainingSub)
+predictionRF <- predict(modFitRF, testingSub, type = "class")
+cfmRF <- confusionMatrix(predictionRF, testingSub$classe)
+print(cfmRF)
+plot(cfmRF$table, col = cfmRF$byClass, main = paste("Random Forest Confusion Matrix: Accuracy =", round(cfmRF$overall['Accuracy'], 4)))
+```
+
+As we can see from above, the random forest model has a 99.2% accuracy, much better than decision tree method. The specificity and sensitivity are >90% for all variables, so I will choose random forest model to predict 20 different test cases in the project Quiz.
+
+##In Sample & Out of Sample Error
+
+The in sample error is error rate when the model is used to predict the training set that it is based off. Usually the in sample error rate is expected to be 0, i.e the model is 100% accurate. Let's see this with the model:
+```{r, echo=TRUE}
+predictionIn <- predict(modFitRF, trainingSub, type = "class")
+cfmIn <- confusionMatrix(predictionIn, trainingSub$classe)
+print(cfmIn)
+```
+
+When the model is used on a separate data set (out of sample error), the error rate is greater than 0, i.e. accuracy will be less than 100%. As with our random forest model, the accuracy is 99.2%.
+
+#Conclusion
+Random Forest is a superior model than decision tree for prediction of project data. The RF model had over 99% accuracy and fitted well to other subsamples of the data.
+
+#Use chosen model (RF) to solve project Quiz
+```{r, echo=TRUE}
+quizAns = predict(modFitRF, newdata=testing)
+print(quizAns)
+```
