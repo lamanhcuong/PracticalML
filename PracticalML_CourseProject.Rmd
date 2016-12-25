@@ -107,27 +107,18 @@ Next we use random forest model to see if the model fits the data better.
 ```{r, echo=TRUE}
 set.seed(2471)
 modFitRF <- randomForest(classe ~ ., data = trainingSub)
+print(modFitRF)
 predictionRF <- predict(modFitRF, testingSub, type = "class")
 cfmRF <- confusionMatrix(predictionRF, testingSub$classe)
 print(cfmRF)
 plot(cfmRF$table, col = cfmRF$byClass, main = paste("Random Forest Confusion Matrix: Accuracy =", round(cfmRF$overall['Accuracy'], 4)))
 ```
 
-As we can see from above, the random forest model has a 99.2% accuracy, much better than decision tree method. The specificity and sensitivity are >90% for all variables, so I will choose random forest model to predict 20 different test cases in the project Quiz.
-
-##In Sample & Out of Sample Error
-
-The in sample error is error rate when the model is used to predict the training set that it is based off. Usually the in sample error rate is expected to be 0, i.e the model is 100% accurate. Let's see this with the model:
-```{r, echo=TRUE}
-predictionIn <- predict(modFitRF, trainingSub, type = "class")
-cfmIn <- confusionMatrix(predictionIn, trainingSub$classe)
-print(cfmIn)
-```
-
-When the model is used on a separate data set (out of sample error), the error rate is greater than 0, i.e. accuracy will be less than 100%. As with our random forest model, the accuracy is 99.2%.
+##Out of Sample Error
+The RF model built from training data has OOB estimate of error rate of 0.75%, and results of cross validate of the model on testing data has a 99.2% accuracy, i.e 0.8% error rate, which is close to the estimate of error rate. 
 
 #Conclusion
-Random Forest is a superior model than decision tree for prediction of project data. The RF model had over 99% accuracy and fitted well to other subsamples of the data.
+Random Forest is a superior model than decision tree for prediction of project data. The RF model had over 99% accuracy and fitted well to other subsamples of the data. I will choose random forest model to predict 20 different test cases in the project Quiz.
 
 #Use chosen model (RF) to solve project Quiz
 ```{r, echo=TRUE}
